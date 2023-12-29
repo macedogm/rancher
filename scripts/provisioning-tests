@@ -159,6 +159,7 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
      dump_rancher_logs
     kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get pods -A
+kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get nodes -o wide
     docker ps
      exit 1
 }
