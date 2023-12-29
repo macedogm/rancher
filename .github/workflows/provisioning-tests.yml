@@ -1,0 +1,44 @@
+name: provisioning-tests
+
+on:
+  push:
+    branches: [ "test" ]
+  workflow_dispatch:
+
+
+jobs:
+  provisioning-tests-k3s:
+    runs-on: test
+#    runs-on: ubuntu-latest
+    container:
+#      image: ghcr.io/macedogm/builder:latest
+#      image: rancher/dapper:v0.6.0
+#      options: --privileged
+#      volumes:
+#        - /var/run/docker.sock:/var/run/docker.sock
+    steps:
+      # This is a workaround needed for the .git dir to be available inside the container
+      # See https://github.com/actions/checkout/issues/335
+#      - name: Configuring Git 
+#        run: apk add git && git config --global --add safe.directory $(pwd)
+
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+            image=moby/buildkit:master
+#          driver-opts: |
+#            network=host
+
+      - name: test
+        run: df -h && docker images && docker ps && docker rmi -f $(docker images -q) && df -h
+#
+      - name: provisioning-tests-k3s
+        env:
+          V2PROV_TEST_DIST: "k3s"
+          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning)_.*$"
+        run: |
+          wget -O /tmp/dapper https://github.com/rancher/dapper/releases/download/v0.6.0/dapper && chmod +x /tmp/dapper
+          sudo /tmp/dapper -d scripts/provisioning-tests
+

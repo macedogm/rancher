@@ -1,5 +1,8 @@
 #!/bin/bash
-set -e
+set -ex
+
+./scripts/build-server
+
 if ./scripts/only-ui-bumps.sh; then
     exit 0
 fi
@@ -68,7 +71,7 @@ curl -sLf ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/
 run_rancher()
 {
     RESTART_COUNT=0
-    while sleep 2; do
+    while sleep 20; do
         if [ "$PID" != "-1" ] && [ ! -e /proc/$PID ]; then
             echo Rancher died
             dump_rancher_logs
@@ -90,10 +93,11 @@ run_rancher()
         fi
         if [ "$PID" = "-1" ]; then
           echo Starting rancher server using run
+#          ./scripts/run &
           ./scripts/run >/tmp/rancher.log 2>&1 &
           PID=$!
         fi
-        sleep 2
+        sleep 20
     done
 }
 
@@ -107,8 +111,8 @@ dump_rancher_logs()
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
-#tail -F /tmp/rancher.log &
-#TPID=$!
+tail -F /tmp/rancher.log &
+TPID=$!
 
 trap "exit 1" 42
 PWRAPPROC="$$"
@@ -118,32 +122,43 @@ run_rancher &
 RANCHER_RUN_PID=$!
 trap cleanup exit
 
+echo "Sleeping for 300"
+sleep 300
+
 echo "Waiting for Rancher to be healthy"
-./scripts/retry --sleep 2 --timeout 300 "curl -sf -o /dev/null http://localhost:8080/ping"
+./scripts/retry --sleep 2 --timeout 600 "curl -sf -o /dev/null http://localhost:8080/ping"
 
 echo "Waiting up to 5 minutes for rancher-webhook deployment"
 ./scripts/retry \
-  --timeout 300 `# Time out after 300 seconds (5 min)` \
+  --timeout 600 `# Time out after 300 seconds (5 min)` \
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null"
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook"
+#  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null"
 
 echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
 ./scripts/retry \
-  --timeout 300 `# Time out after 300 seconds (5 min)` \
+  --timeout 600 `# Time out after 300 seconds (5 min)` \
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-provisioning-capi was not available after {{elapsed}} seconds" `# Print this progress message` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-provisioning-capi-system deploy/capi-controller-manager &>/dev/null"
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-provisioning-capi-system deploy/capi-controller-manager"
+#  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-provisioning-capi-system deploy/capi-controller-manager &>/dev/null"
 
 
-#kill $TPID
+kill $TPID
 
 echo Running provisioning-tests $RUNARG
+
+
+kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get nodes -o wide
+kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get pods -A
 
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 go test $RUNARG -v -failfast -timeout 60m ./tests/v2prov/tests/... || {
      dump_rancher_logs
+    kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get pods -A
+    docker ps
      exit 1
 }

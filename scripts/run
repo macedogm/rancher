@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ex
 
 echo Starting rancher server
 cd $(dirname $0)/..
@@ -11,6 +11,7 @@ fi
 
 if [ ! -z $1 ] && ( [ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ] ); then
   LOGFLAG=$1
+  LOGFLAG="--debug"
 fi
 
 rm -rf build/testdata

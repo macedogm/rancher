@@ -29,7 +29,6 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
 
 RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.52.0; \
-        curl -H 'Cache-Control: no-cache' https://raw.githubusercontent.com/fossas/spectrometer/master/install.sh | sh; \
     fi
 
 # Tool for CRD generation.
@@ -126,6 +125,7 @@ ENV DAPPER_DOCKER_SOCKET true
 ARG CI
 ARG DRONE_BUILD_NUMBER
 ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
+
 ENV GOCACHE /root/.cache/go-build
 ENV HOME ${DAPPER_SOURCE}
 
